@@ -1,7 +1,7 @@
 all: main
 
-main: main.o sim.o instr.o config.o
-	g++ main.o sim.o instr.o config.o -o main -g -std=c++11
+main: main.o sim.o instr.o config.o tomasulo.o
+	g++ main.o sim.o instr.o config.o tomasulo.o -o main -g -std=c++11
 
 main.o: main.cpp sim.cpp sim.h instr.h config.h
 	g++ main.cpp -c -o main.o -g -std=c++11
@@ -14,3 +14,6 @@ instr.o: instr.h config.h instr.cpp
 
 config.o: config.cpp config.h
 	g++ config.cpp -c -o config.o -g -std=c++11
+
+tomasulo.o: tomasulo.cpp sim.h instr.h config.h
+	g++ tomasulo.cpp -c -o tomasulo.o -g -std=c++11

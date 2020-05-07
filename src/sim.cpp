@@ -27,7 +27,7 @@ void Sim::init() {
 }
 void Sim::run() {
 	//fprintf(fo, "%d\n", n);
-	//TODO excute instrs
+	//excute instrs
 	for (int i = 0, c = 1, j = 1; i < n; i+=j, c++) {
 		//fprintf(fo, "inst %d: %d\t %d\t %d\t %d\n", i, inst[i].type, inst[i].d1, inst[i].d2, inst[i].d3);
 		//printf("reg:\t");

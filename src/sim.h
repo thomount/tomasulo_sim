@@ -29,3 +29,16 @@ public:
 };
 
 //TODO Tomasolu 算法
+class Tomasulo: public Sim {
+protected:
+public:
+	Tomasulo() {
+	}
+	~Tomasulo() {
+
+	}
+	int calc(unsigned char type, unsigned int r1, unsigned int r2, unsigned int r3);
+	void config(FILE * _fi, FILE * _fo);
+	void init();
+	void run();
+};
