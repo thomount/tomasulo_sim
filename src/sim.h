@@ -28,7 +28,7 @@ public:
 	
 };
 
-//TODO Tomasolu 算法
+//Tomasolu 算法
 class Tomasulo: public Sim {
 protected:
 public:
