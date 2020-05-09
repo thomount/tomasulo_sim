@@ -25,6 +25,8 @@ void Sim::config(FILE * _fi, FILE * _fo) {
 void Sim::init() {
 	memset(reg, 0, sizeof(reg));
 }
+static const char name[6][5] = {"ADD", "SUB", "MULT", "DIV", "LOAD", "JUMP"};
+
 void Sim::run() {
 	//fprintf(fo, "%d\n", n);
 	//excute instrs
@@ -40,6 +42,7 @@ void Sim::run() {
 		}
 		//fprintf(fo, "%d %d %d %d\n", i, is[i], ex[i], wb[i]);
 		//for (int k = 0; k < 5; k++) fprintf(fo, "%d ", reg[k]); fprintf(fo, "\n");
+		//printf("cp = %d: ", i);
 		j = calc(inst[i].type, inst[i].d1, inst[i].d2, inst[i].d3);
 		//printf("ret = %d\n" , j);
 		
@@ -50,6 +53,8 @@ void Sim::run() {
 }
 
 int Sim::calc(unsigned char type, unsigned int r1, unsigned int r2, unsigned int r3) {
+	//if (type <= DIV_TYPE) printf("%s %d %d\n", name[type], reg[r2], reg[r3]);
+
 	if (type == JUMP_TYPE) {
 		if (reg[r2] == r1) return r3;
 	}

@@ -15,5 +15,5 @@ instr.o: instr.h config.h instr.cpp
 config.o: config.cpp config.h
 	g++ config.cpp -c -o config.o -g -std=c++11
 
-tomasulo.o: tomasulo.cpp sim.h instr.h config.h
+tomasulo.o: tomasulo.cpp sim.h instr.h config.h sim.cpp
 	g++ tomasulo.cpp -c -o tomasulo.o -g -std=c++11
