@@ -81,6 +81,8 @@ void Tomasulo::emit(Instr ins, int st, int en, int cp) {	//指令进入保留站
 				if (rf[ins.d2] == -1) RS[i].v2 = reg[ins.d2];
 				RS[i].ret = ins.d3;	
 				block = true;							//中断防止后续指令进入
+				//TODO : 若当前非虚拟状态，则建立分支空间，并把当前RS、reg拷贝，并将状态改为虚拟
+				//		 若已经是虚拟状态，则阻塞知道虚拟状态解除
 			}
 			//if (RS[i].q1 == -1 && RS[i].q2 == -1) {		统一就绪
 			//	RS[i].busy = 2;
@@ -199,6 +201,8 @@ void Tomasulo::databus(int fu, unsigned int val) {
 		add_writer(RS[fu].ret, val, fu);
 		//printf("add writer over\n");
 	} else {
+		//TODO: 检查是否预测正确，若预测正确则将虚拟空间commit并将所有虚拟保留站实体化
+		//		若检测不正确，则放弃所有虚拟保留站和虚拟空间
 		if (val == 1) cp_next = cp+RS[fu].ret; else cp_next = cp + 1;
 		block = false;
 	}
@@ -217,11 +221,14 @@ void Tomasulo::add_writer(int reg, int val, int fu) {
 }
 
 void Tomasulo::clean_writer() {
+	//TODO: 需要区分当前更新是虚拟更新还是现实更新，若为虚拟更新只更新虚拟空间，现实更新都要更新
+	//
+
 //	printf("cleaning +\n");
 	for (int k = 0; k < WB_top; k++) {
 		WriteEvent x = WB[k];
 //		printf("%d %d\n", x.fu, rf[x.reg]);
-		if (x.fu == rf[x.reg]) {
+		if (x.fu == rf[x.reg]) {			
 			reg[x.reg] = x.val;
 			rf[x.reg] = -1;
 		}
