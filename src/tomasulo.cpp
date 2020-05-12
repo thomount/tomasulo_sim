@@ -46,6 +46,9 @@ void Tomasulo::init() {
 	//printf("%d %d %d\n", pending[0].Q, pending[1].Q, pending[2].Q);
 	cp = 0, clock = 0;
 	block = false;
+	vir = false;
+	predict = new bool[n];
+	for (int i = 0; i < n; i++) predict[i] = true;
 }
 
 void Tomasulo::emit(Instr ins, int st, int en, int cp) {	//指令进入保留站
@@ -60,6 +63,7 @@ void Tomasulo::emit(Instr ins, int st, int en, int cp) {	//指令进入保留站
 			RS[i].tar = -1;
 			RS[i].v1 = 0;
 			RS[i].v2 = 0;
+			RS[i].vir = vir;
 			if (ins.type <= DIV_TYPE) {
 				RS[i].q1 = rf[ins.d2];
 				if (rf[ins.d2] == -1) RS[i].v1 = reg[ins.d2];
@@ -80,9 +84,22 @@ void Tomasulo::emit(Instr ins, int st, int en, int cp) {	//指令进入保留站
 				RS[i].q2 = rf[ins.d2];
 				if (rf[ins.d2] == -1) RS[i].v2 = reg[ins.d2];
 				RS[i].ret = ins.d3;	
-				block = true;							//中断防止后续指令进入
-				//TODO : 若当前非虚拟状态，则建立分支空间，并把当前RS、reg拷贝，并将状态改为虚拟
-				//		 若已经是虚拟状态，则阻塞知道虚拟状态解除
+				//block = true;							//中断防止后续指令进入
+				//TODO+ 若当前非虚拟状态，则建立分支空间，并把当前RS、reg拷贝，并将状态改为虚拟
+				//		若已经是虚拟状态，则阻塞直到虚拟状态解除
+				if (predict_flag == false) block = true; else {
+					if (vir == false) {
+						vir = true;
+						block = false;
+						cp_next = cp + (predict[cp])?ins.d3:1;
+						branch = cp;
+
+						memcpy(vrf, rf, sizeof(rf));
+						memcpy(vreg, reg, sizeof(reg));
+					} else {
+						block = true;
+					}
+				}
 			}
 			//if (RS[i].q1 == -1 && RS[i].q2 == -1) {		统一就绪
 			//	RS[i].busy = 2;
@@ -192,45 +209,90 @@ void Tomasulo::show(int flag){
 }
  
 void Tomasulo::databus(int fu, unsigned int val) {
+	if (RS[fu].busy != 3) return;		//指令已经失效，不广播
 	//指令执行结束
 	//printf("Excute over : %d %d %d %d\n", fu, val, RS[fu].cp, RS[fu].ret);
 	if (!ex[RS[fu].cp]) ex[RS[fu].cp] = clock;
 	if (RS[fu].op != JUMP_TYPE) {
 		if (!wb[RS[fu].cp]) wb[RS[fu].cp] = clock+1;
 		//printf("%d %d %d\n", is[RS[fu].cp], ex[RS[fu].cp], wb[RS[fu].cp]);
-		add_writer(RS[fu].ret, val, fu);
+		add_writer(RS[fu].ret, val, fu, RS[fu].vir);
 		//printf("add writer over\n");
 	} else {
-		//TODO: 检查是否预测正确，若预测正确则将虚拟空间commit并将所有虚拟保留站实体化
+		//TODO+: 检查是否预测正确，若预测正确则将虚拟空间commit并将所有虚拟保留站实体化
 		//		若检测不正确，则放弃所有虚拟保留站和虚拟空间
-		if (val == 1) cp_next = cp+RS[fu].ret; else cp_next = cp + 1;
-		block = false;
+		if (predict_flag) {
+			if (RS[fu].cp == branch) {
+				
+				if (val == predict[branch]) {		//预测成功
+					memcpy(reg, vreg, sizeof(reg));
+					memcpy(rf, vrf, sizeof(rf));
+					//实体化所有虚拟执行指令
+					for(int i = 0; i < ADD_S+MULT_S+LOAD_S; i++) 
+						if(RS[i].busy > 0 && RS[i].vir == true)
+							RS[i].vir = false;
+				} else {							//预测失败，到目标地址
+					if (val == 1) cp_next = branch+RS[fu].ret; else cp_next = branch + 1;
+					predict[branch] = val;			//修改预测值
+					//清除所有虚拟执行指令
+					for(int i = 0; i < ADD_S+MULT_S+LOAD_S; i++) 
+						if(RS[i].busy > 0 && RS[i].vir == true) {
+							RS[i].busy = 0;
+							RS[i].vir = false;
+							que[Instr2Op(RS[i].op)]--;
+						}
+				}
+				//清除虚拟空间，理论上可以不清理
+				memset(vreg, 0, sizeof(vreg));
+				memset(vrf, -1, sizeof(vrf));
+
+				vir = false;
+				block = false;
+			} else {
+				printf("error occur when cp=%d is in calced but virtual at cp=%d\n", RS[fu].cp, branch);
+			}
+		} else {
+			if (val == 1) cp_next = cp+RS[fu].ret; else cp_next = cp+1;
+			block = false;
+		}
+		
 	}
-	RS[fu].busy = 0;
-	que[Instr2Op(RS[fu].op)]--;
+	if (RS[fu].busy) {
+		RS[fu].busy = 0;
+		que[Instr2Op(RS[fu].op)]--;
+	}
 
 	//printf("Excute finish\n");
 
 }
 
-void Tomasulo::add_writer(int reg, int val, int fu) {
-	WB[WB_top].reg = reg;
+void Tomasulo::add_writer(int _reg, int val, int fu, bool _vir) {
+	WB[WB_top].reg = _reg;
 	WB[WB_top].fu = fu;
 	WB[WB_top].val = val;
+	WB[WB_top].vir = _vir;
 	WB_top++;
 }
 
 void Tomasulo::clean_writer() {
-	//TODO: 需要区分当前更新是虚拟更新还是现实更新，若为虚拟更新只更新虚拟空间，现实更新都要更新
+	//TODO+: 需要区分当前更新是虚拟更新还是现实更新，若为虚拟更新只更新虚拟空间，现实更新都要更新
 	//
 
 //	printf("cleaning +\n");
 	for (int k = 0; k < WB_top; k++) {
 		WriteEvent x = WB[k];
-//		printf("%d %d\n", x.fu, rf[x.reg]);
-		if (x.fu == rf[x.reg]) {			
-			reg[x.reg] = x.val;
-			rf[x.reg] = -1;
+		if (x.vir == false) {			//如果x为真实数据广播
+	//		printf("%d %d\n", x.fu, rf[x.reg]);
+			if (x.fu == rf[x.reg]) {			
+				reg[x.reg] = x.val;
+				rf[x.reg] = -1;
+			}
+		}
+		if (vir == true) {				//虚拟空间不论真实广播和虚拟广播都要接受并修改
+			if (x.fu == vrf[x.reg]) {			
+				vreg[x.reg] = x.val;
+				vrf[x.reg] = -1;
+			}
 		}
 		for (int i = 0; i < ADD_S+MULT_S+LOAD_S; i++) {
 			if (RS[i].q1 == x.fu) RS[i].q1 = -1, RS[i].v1 = x.val;
@@ -242,13 +304,23 @@ void Tomasulo::clean_writer() {
 }
 
 void Tomasulo::writer_preclean(int _reg, int _ind) {
+	//TODO+: 需要区分当前更新是虚拟更新还是现实更新，若为虚拟更新只更新虚拟空间，现实更新都要更新
 	for (int k = 0; k < WB_top; k++) {
 		WriteEvent x = WB[k];
 //		printf("%d %d\n", x.fu, rf[x.reg]);
 		if (x.reg == _reg && x.fu == _ind) {
-			if (x.fu == rf[x.reg]) {
-				reg[x.reg] = x.val;
-				rf[x.reg] = -1;
+			if (x.vir == false) {			//如果x为真实数据广播
+		//		printf("%d %d\n", x.fu, rf[x.reg]);
+				if (x.fu == rf[x.reg]) {			
+					reg[x.reg] = x.val;
+					rf[x.reg] = -1;
+				}
+			}
+			if (vir == true) {				//虚拟空间不论真实广播和虚拟广播都要接受并修改
+				if (x.fu == vrf[x.reg]) {			
+					vreg[x.reg] = x.val;
+					vrf[x.reg] = -1;
+				}
 			}
 			for (int i = 0; i < ADD_S+MULT_S+LOAD_S; i++) {
 				if (RS[i].q1 == x.fu) RS[i].q1 = -1, RS[i].v1 = x.val;

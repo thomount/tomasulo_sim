@@ -46,6 +46,7 @@ struct station{	//
 	int q1, q2, ret;
 	int cp;
 	int clock;
+	bool vir;
 	station():busy(0) {}
 };
 
@@ -67,6 +68,7 @@ struct queue {
 struct WriteEvent {
 	int reg, fu=-1;
 	unsigned int val;
+	bool vir;
 	WriteEvent() {
 	}
 };
@@ -87,8 +89,17 @@ protected:
 	bool block;
 	WriteEvent WB[ADD_N+MULT_N+LOAD_N];
 	int WB_top;
+
+	// For branch prediction
+	int vrf[32];
+	unsigned vreg[32];
+	bool vir;
+	bool *predict;
+	int branch;	//产生分支的cp
+	bool predict_flag=false;
 public:
-	Tomasulo() {
+	Tomasulo(bool flag=false) {
+		predict_flag = flag;
 	}
 	~Tomasulo() {
 
@@ -103,7 +114,7 @@ public:
 	void check_pending();
 	void send(int index);
 	void print(int flag = -1);
-	void add_writer(int, int, int);
+	void add_writer(int, int, int, bool);
 	void clean_writer();
 	void show(int flag);
 	void show_regs(int);
