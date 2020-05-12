@@ -30,8 +30,9 @@ static const char name[6][5] = {"ADD", "SUB", "MULT", "DIV", "LOAD", "JUMP"};
 void Sim::run() {
 	//fprintf(fo, "%d\n", n);
 	//excute instrs
-	for (int i = 0, c = 1, j = 1; i < n; i+=j, c++) {
-		//fprintf(fo, "inst %d: %d\t %d\t %d\t %d\n", i, inst[i].type, inst[i].d1, inst[i].d2, inst[i].d3);
+	int c = 1;
+	for (int i = 0, j = 1; i < n; i+=j, c++) {
+//		fprintf(fo, "@%d\t inst %d: %s\t %d\t %d\t %d\n", c, i, name[inst[i].type], inst[i].d1, inst[i].d2, inst[i].d3);
 		//printf("reg:\t");
 		//for (int k = 1; k <= 4; k++) printf("%d\t", reg[k]);
 		//printf("\n");
@@ -39,7 +40,7 @@ void Sim::run() {
 			is[i] = c;
 			ex[i] = (c += (inst[i].type==DIV_TYPE && reg[inst[i].d3] == 0)? 1: CALC_T[inst[i].type]);
 			wb[i] = (++c);
-		}
+		} else (c += (inst[i].type==DIV_TYPE && reg[inst[i].d3] == 0)? 1: CALC_T[inst[i].type])+1;
 		//fprintf(fo, "%d %d %d %d\n", i, is[i], ex[i], wb[i]);
 		//for (int k = 0; k < 5; k++) fprintf(fo, "%d ", reg[k]); fprintf(fo, "\n");
 		//printf("cp = %d: ", i);
@@ -47,9 +48,10 @@ void Sim::run() {
 		//printf("ret = %d\n" , j);
 		
 	}
-	for (int i = 0; i < n; i++) fprintf(fo, "%d %d %d %d\n", i, is[i], ex[i], wb[i]);
-	fprintf(fo, "\nRegister usage:\n");
-	for (int i = 0; i < 32; i++) fprintf(fo, "Reg %3d:%10d\n", i, reg[i]);
+	for (int i = 0; i < n; i++) fprintf(fo, "%d %d %d\n", is[i], ex[i], wb[i]);
+	fprintf(fo, "\nRegister:\n");
+	for (int i = 0; i < 32; i++) fprintf(fo, "Reg %3d: %10d\n", i, reg[i]);
+	fprintf(fo, "Total clocks = %d\n", c);
 }
 
 int Sim::calc(unsigned char type, unsigned int r1, unsigned int r2, unsigned int r3) {
