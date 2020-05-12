@@ -48,9 +48,9 @@ void Sim::run() {
 		//printf("ret = %d\n" , j);
 		
 	}
-	for (int i = 0; i < n; i++) fprintf(fo, "%d %d %d %d\n", i, is[i], ex[i], wb[i]);
-	fprintf(fo, "\nRegister usage:\n");
-	for (int i = 0; i < 32; i++) fprintf(fo, "Reg %3d:%10d\n", i, reg[i]);
+	for (int i = 0; i < n; i++) fprintf(fo, "%d %d %d\n", is[i], ex[i], wb[i]);
+	fprintf(fo, "\nRegister:\n");
+	for (int i = 0; i < 32; i++) fprintf(fo, "Reg %3d: %10d\n", i, reg[i]);
 	fprintf(fo, "Total clocks = %d\n", c);
 }
 
