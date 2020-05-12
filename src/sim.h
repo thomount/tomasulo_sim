@@ -97,6 +97,7 @@ protected:
 	bool *predict;
 	int branch;	//产生分支的cp
 	bool predict_flag=false;
+	int acc = 0, ptot = 0;
 public:
 	Tomasulo(bool flag=false) {
 		predict_flag = flag;

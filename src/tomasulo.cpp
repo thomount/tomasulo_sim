@@ -49,11 +49,13 @@ void Tomasulo::init() {
 	vir = false;
 	predict = new bool[n];
 	for (int i = 0; i < n; i++) predict[i] = true;
+	acc = ptot = 0;
 }
 
 void Tomasulo::emit(Instr ins, int st, int en, int cp) {	//指令进入保留站
 	for (int i = st; i < en; i++) {
 		if (RS[i].busy == 0) {
+			//printf("emiting %d: %s\t%d\t%d\t%d\t   into   %d\n", cp, name[ins.type], ins.d1, ins.d2, ins.d3, i);
 			if (ins.type <= DIV_TYPE)
 				writer_preclean(ins.d1, i);
 
@@ -65,21 +67,31 @@ void Tomasulo::emit(Instr ins, int st, int en, int cp) {	//指令进入保留站
 			RS[i].v2 = 0;
 			RS[i].vir = vir;
 			if (ins.type <= DIV_TYPE) {
-				RS[i].q1 = rf[ins.d2];
-				if (rf[ins.d2] == -1) RS[i].v1 = reg[ins.d2];
-				RS[i].q2 = rf[ins.d3];
-				if (rf[ins.d3] == -1) RS[i].v2 = reg[ins.d3];
+				if (!vir) {
+					RS[i].q1 = rf[ins.d2];
+					if (rf[ins.d2] == -1) RS[i].v1 = reg[ins.d2];
+					RS[i].q2 = rf[ins.d3];
+					if (rf[ins.d3] == -1) RS[i].v2 = reg[ins.d3];
+				} else {
+					RS[i].q1 = vrf[ins.d2];
+					if (vrf[ins.d2] == -1) RS[i].v1 = vreg[ins.d2];
+					RS[i].q2 = vrf[ins.d3];
+					if (vrf[ins.d3] == -1) RS[i].v2 = vreg[ins.d3];
+				}
 				RS[i].ret = ins.d1;
 				//printf("load cp = %d: %s R%d R%d R%d -> R%d(%d)\n", RS[i].cp, name[RS[i].op], ins.d1, ins.d2, ins.d3, ins.d1, i);
-				rf[RS[i].ret] = i;
+				if (vir) vrf[RS[i].ret] = i; else rf[RS[i].ret] = i;
 			}
 			if (ins.type == LD_TYPE) {
 				RS[i].q1 = -1; RS[i].v1 = 0;
 				RS[i].q2 = -1; RS[i].v2 = ins.d2;
 				RS[i].ret = ins.d1;
-				rf[RS[i].ret] = i;
+				if (vir) vrf[RS[i].ret] = i; else rf[RS[i].ret] = i;
 			}
 			if (ins.type == JUMP_TYPE) {
+				if (vir)  {
+					printf("error: emit JUMP when predicting\n");
+				}
 				RS[i].q1 = -1; RS[i].v1 = ins.d1;
 				RS[i].q2 = rf[ins.d2];
 				if (rf[ins.d2] == -1) RS[i].v2 = reg[ins.d2];
@@ -91,16 +103,17 @@ void Tomasulo::emit(Instr ins, int st, int en, int cp) {	//指令进入保留站
 					if (vir == false) {
 						vir = true;
 						block = false;
-						cp_next = cp + (predict[cp])?ins.d3:1;
+						cp_next = cp + ((predict[cp])?ins.d3:1);
 						branch = cp;
 
 						memcpy(vrf, rf, sizeof(rf));
 						memcpy(vreg, reg, sizeof(reg));
+						//printf("predicting on cp=%d with %d\n", cp, predict[cp]);
 					} else {
 						block = true;
 					}
 				}
-			}
+			} else cp_next = cp+1;
 			//if (RS[i].q1 == -1 && RS[i].q2 == -1) {		统一就绪
 			//	RS[i].busy = 2;
 			//	add_pending(i);
@@ -154,11 +167,11 @@ void Tomasulo::run() {
 		if (cp < n) {
 			Instr ins = inst[cp];		//取指令
 			int type = Instr2Op(ins.type);
-			if (!block && que[type] < RS_N[type]) {		//未阻塞且保留站有空间
+			//printf("condition : %d %d %d\n", vir, type==JUMP_TYPE, (!vir || type != JUMP_TYPE));
+			if (!block && (!vir || ins.type != JUMP_TYPE) && que[type] < RS_N[type]) {		//未阻塞且保留站有空间
 				if (!is[cp]) is[cp] = clock;
 				que[type] ++;
 				emit(ins, RS_st[type], RS_en[type], cp);
-				if (!block) cp_next = cp+1;
 			}
 			
 		}
@@ -177,7 +190,7 @@ void Tomasulo::run() {
 			}
 		}
 		print(-1);
-		//show_regs(0);
+		//show_regs(5);
 		cp = cp_next;
 		BUSY = que[0] || que[1] || que[2] || use[0] || use[1] || use[2] || WB_top;
 	}
@@ -192,6 +205,8 @@ void Tomasulo::show(int flag){
 			printf("%d %d %d\n", is[i], ex[i], wb[i]);
 		printf("\nRegister:\n");
 		for (int i = 0; i < 32; i++) printf("Reg %3d: %10d\n", i, reg[i]);
+		printf("Total clocks = %d\n", clock);
+		if (predict_flag) printf("prediction accuracy = %.3f\n", 100.0*acc/ptot);
 	} else {
 //		printf("start printing\n");
 //		printf("%d\n", f);
@@ -205,6 +220,8 @@ void Tomasulo::show(int flag){
 //			printf("Reg %3d: %10d\n", i, reg[i]);
 			fprintf(fo, "Reg %3d: %10d\n", i, reg[i]);
 		}
+		fprintf(fo, "Total clocks = %d\n", clock);
+		if (predict_flag && ptot > 0) fprintf(fo, "prediction accuracy = %.3f\n", 100.0*acc/ptot);
 	}
 }
  
@@ -223,8 +240,10 @@ void Tomasulo::databus(int fu, unsigned int val) {
 		//		若检测不正确，则放弃所有虚拟保留站和虚拟空间
 		if (predict_flag) {
 			if (RS[fu].cp == branch) {
-				
+				//printf("get result on cp=%d with %d\n", RS[fu].cp, val);
+				ptot ++;
 				if (val == predict[branch]) {		//预测成功
+					acc++;
 					memcpy(reg, vreg, sizeof(reg));
 					memcpy(rf, vrf, sizeof(rf));
 					//实体化所有虚拟执行指令
@@ -332,9 +351,13 @@ void Tomasulo::writer_preclean(int _reg, int _ind) {
 
 }
 void Tomasulo::show_regs(int lim) {
-	printf("clock = %3d cp = %3d\t", clock, cp); 
+	printf("clock = %3d cp = %3d\n  ", clock, cp); 
 	for(int i = 0; i < lim; i++) printf("R%d(%d): %d;   ", i, rf[i], reg[i]);
-	printf("\n");
+	printf("\n  ");
+	if (vir) {
+		for(int i = 0; i < lim; i++) printf("r%d(%d): %d;   ", i, vrf[i], vreg[i]);
+		printf("\n");
+	}
 }
 
 void Tomasulo::print(int flag) {		//0 normal 1 short 2 long
