@@ -1,7 +1,7 @@
 #include "instr.h"
 #include <cstdio>
 #include <cstring>
-int str2Type(char ch[20]) {
+int str2Type(char ch[50]) {
 	if (ch[0] == 'L') 	//LD
 		return LD_TYPE;
 	if (ch[0] == 'A') 	//ADD
@@ -15,11 +15,13 @@ int str2Type(char ch[20]) {
 	if (ch[0] == 'J') 	//ADD
 		return JUMP_TYPE;
 }
-unsigned int parseInt(char ch[20]) {	//立即数
+unsigned int parseInt(char ch[50]) {	//立即数
 	if (strlen(ch) > 1 && ch[1] == 'x') {	//十六
 		unsigned int ret = 0;
+		//printf("%s : ", ch);
 		for (int i = 2; i < strlen(ch); i++) 
 			ret = ret * 16 + ((ch[i]<='9')?(ch[i]-'0'):(ch[i]-'A'+10));
+		//printf("%d\n", ret);
 		return ret;
 	} else {		
 		unsigned int ret = 0;
@@ -27,14 +29,14 @@ unsigned int parseInt(char ch[20]) {	//立即数
 		return ret;
 	}
 }
-unsigned int parseR(char ch[20]) {		//寄存器
+unsigned int parseR(char ch[50]) {		//寄存器
 	int i = 1, ret = 0;
 	while (i < strlen(ch)) ret = ret * 10 + ch[i++]-'0';
 	return ret;
 }
 Instr parse(char s[100]) {
 	//根据字符串解析出编译命令
-	char op[4][20];
+	char op[4][50];
 	memset(op, 0, sizeof(op));
 	int st = 0, w = 0, i = 0, l = strlen(s);
 	while (st < l) {

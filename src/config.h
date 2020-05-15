@@ -23,4 +23,5 @@ const int MULT_OP = 1;
 const int LD_OP = 2;
 const int FU_N[3] = {3,2,2};
 const int RS_N[3] = {6,3,3};
+static int printConfig = 0;
 int Instr2Op(int);		//根据指令类型返回其需要的运算单元类型
