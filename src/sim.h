@@ -14,6 +14,7 @@ protected:
 	FILE * fi, * fo;
 	unsigned int reg[32];
 public:
+	int printConfig = 0;
 	Sim() {
 	}
 	~Sim() {
@@ -99,6 +100,7 @@ protected:
 	bool predict_flag=false;
 	int acc = 0, ptot = 0;
 public:
+
 	Tomasulo(bool flag=false) {
 		predict_flag = flag;
 	}

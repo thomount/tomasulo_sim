@@ -75,9 +75,20 @@ int main(int argc, char ** argv) {
 		use.insert(use.end(), perf.begin(), perf.end());
 		use.insert(use.end(), example.begin(), example.end());
 		method = "";
-		printConfig = 1;
+		sim->printConfig = 1;
 	}
-	printf("use size = %d\n", use.size());
+	if (argc > 1 && string(argv[1]) == "-detail") {
+		Odir += "2017011315_";
+		use = example;
+		sim = new Tomasulo(true);
+		use = base;
+		use.insert(use.end(), ext.begin(), ext.end());
+		use.insert(use.end(), perf.begin(), perf.end());
+		use.insert(use.end(), example.begin(), example.end());
+		method = "";
+		sim->printConfig = 2;
+	}
+	printf("test set size = %d\n", use.size());
 	for (string i: use) {
 		printf("%s test testing...", i.c_str());
 		int st = clock();

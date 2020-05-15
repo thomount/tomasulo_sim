@@ -191,7 +191,7 @@ void Tomasulo::run() {
 				use[Instr2Op(f[i].op)]--;		//单元使用情况更新
 			}
 		}
-		print(-1);
+		print((printConfig == 2)?2:-1);
 		//show_regs(12);
 		cp = cp_next;
 		BUSY = que[0] || que[1] || que[2] || use[0] || use[1] || use[2] || WB_top;
