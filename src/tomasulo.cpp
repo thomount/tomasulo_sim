@@ -37,7 +37,7 @@ void Tomasulo::init() {
 	memset(que, 0, sizeof(que));
 	//补全init
 	for (int i = 0; i < ADD_N+MULT_N+LOAD_N; i++) f[i].busy = false;
-	for (int i = 0; i < ADD_S+MULT_S+LOAD_S; i++) RS[i].busy = 0;
+	for (int i = 0; i < ADD_S+MULT_S+LOAD_S; i++) RS[i].busy = 0, RS[i].vir = false;
 	for (int i = 0; i < ADD_N+MULT_N+LOAD_N; i++) WB[i].fu = -1;
 	WB_top = 0;
 	pending[0] = queue(ADD_S+2);
@@ -126,6 +126,7 @@ void Tomasulo::emit(Instr ins, int st, int en, int cp) {	//指令进入保留站
 //pending队列维护
 void Tomasulo::add_pending(int index) {				//保留站中就绪的指令加入排队
 	//printf("ready cp = %d\n", RS[index].cp);
+	if(RS[index].busy != 1) return;
 	RS[index].busy = 2;
 	RS[index].clock = clock;
 	int type = Instr2Op(RS[index].op);
@@ -145,7 +146,8 @@ void Tomasulo::check_pending() {					//从队列中将就绪排队指令送入�
 }
 
 //将一条指令从队列送入运算器
-void Tomasulo::send(int index) {					
+void Tomasulo::send(int index) {
+	if (RS[index].busy != 2) return;
 //	printf("send %d\n", index);
 	int type = Instr2Op(RS[index].op);
 	use[type] ++;
@@ -189,8 +191,8 @@ void Tomasulo::run() {
 				use[Instr2Op(f[i].op)]--;		//单元使用情况更新
 			}
 		}
-		print(-1);
-		//show_regs(5);
+		print((printConfig == 2)?2:-1);
+		//show_regs(12);
 		cp = cp_next;
 		BUSY = que[0] || que[1] || que[2] || use[0] || use[1] || use[2] || WB_top;
 	}
@@ -215,6 +217,7 @@ void Tomasulo::show(int flag){
 //			printf("%d %d %d\n", is[i], ex[i], wb[i]);
 			fprintf(fo, "%d %d %d\n", is[i], ex[i], wb[i]);
 		}
+		if (printConfig == 1) return;
 		fprintf(fo, "\nRegister:\n");
 		for (int i = 0; i < 32; i++) {
 //			printf("Reg %3d: %10d\n", i, reg[i]);
@@ -363,14 +366,14 @@ void Tomasulo::show_regs(int lim) {
 void Tomasulo::print(int flag) {		//0 normal 1 short 2 long
 	if (flag == -1) return;
 	if (flag == 1) {	//Brief
-		printf("CLOCK = %d\tCP = %d\n", clock, cp);
+		printf("CLOCK = %d\tCP = %d\tUSE = %d\tQUE = %d\tBLOCK = %d\tVIR = %d\n", clock, cp, use[0]+use[1]+use[2], que[0]+que[1]+que[2], block, vir);
 		return;
 	}
-	printf("=================================\nCLock = %4d\t\t CP = %4d(%4d)\nBlock = %d\n", clock, cp, cp_next, block);
-	printf("ID\tBUSY\tCP\top\tq1\tv1\tq2\tv2\tLEFT\n");
+	printf("=================================\nCLock = %4d\t\t CP = %4d(%4d)\nBlock = %d\t Vir = %d\n", clock, cp, cp_next, block, vir);
+	printf("ID\tBUSY\tCP\top\tq1\tv1\tq2\tv2\tLEFT\tVIR\n");
 	for (int i = 0; i < ADD_S+MULT_S+LOAD_S; i++)
 		if (RS[i].busy != 0) 
-			printf("%d\t%d\t%d\t%s\t%d\t%d\t%d\t%d\t%d\n", i, RS[i].busy, RS[i].cp, name[RS[i].op], RS[i].q1, RS[i].v1, RS[i].q2, RS[i].v2, (RS[i].tar != -1)? f[RS[i].tar].left: -1); 
+			printf("%d\t%d\t%d\t%s\t%d\t%d\t%d\t%d\t%d\t%d\n", i, RS[i].busy, RS[i].cp, name[RS[i].op], RS[i].q1, RS[i].v1, RS[i].q2, RS[i].v2, (RS[i].tar != -1)? f[RS[i].tar].left: -1, RS[i].vir); 
 	printf("Write back:\n");
 	for (int i = 0; i < WB_top; i++)
 		printf("(R%d(%d) = %d)\n", WB[i].reg, WB[i].fu, WB[i].val);
